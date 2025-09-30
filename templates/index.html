@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistema de Pedidos</title>
+    <script src="https://cdn.socket.io/4.5.0/socket.io.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: grid;
+            grid-template-columns: 1fr 400px;
+            gap: 20px;
+        }
+        
+        .chat-container {
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            height: 80vh;
+        }
+        
+        .orders-container {
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            padding: 20px;
+            height: 80vh;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .chat-header {
+            background: #4f46e5;
+            color: white;
+            padding: 20px;
+            text-align: center;
+        }
+        
+        .chat-messages {
+            flex: 1;
+            padding: 20px;
+            overflow-y: auto;
+            background: #f8fafc;
+        }
+        
+        .message {
+            margin-bottom: 15px;
+            padding: 12px 16px;
+            border-radius: 18px;
+            max-width: 80%;
+            word-wrap: break-word;
+        }
+        
+        .user-message {
+            background: #4f46e5;
+            color: white;
+            margin-left: auto;
+            border-bottom-right-radius: 5px;
+        }
+        
+        .bot-message {
+            background: #e2e8f0;
+            color: #334155;
+            margin-right: auto;
+            border-bottom-left-radius: 5px;
+            white-space: pre-line;
+        }
+        
+        .chat-input {
+            padding: 20px;
+            border-top: 1px solid #e2e8f0;
+            background: white;
+        }
+        
+        .input-group {
+            display: flex;
+            gap: 10px;
+        }
+        
+        input {
+            flex: 1;
+            padding: 12px 16px;
+            border: 2px solid #e2e8f0;
+            border-radius: 25px;
+            outline: none;
+            font-size: 14px;
+            transition: border-color 0.3s;
+        }
+        
+        input:focus {
+            border-color: #4f46e5;
+        }
+        
+        button {
+            background: #4f46e5;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background 0.3s;
+        }
+        
+        button:hover {
+            background: #4338ca;
+        }
+        
+        .orders-header {
+            display: flex;
+            justify-content: between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid #e2e8f0;
+        }
+        
+        .orders-header h2 {
+            color: #1e293b;
+            font-size: 1.5em;
+        }
+        
+        .download-btn {
+            background: #10b981;
+            padding: 8px 16px;
+            font-size: 12px;
+        }
+        
+        .download-btn:hover {
+            background: #059669;
+        }
+        
+        .orders-list {
+            flex: 1;
+            overflow-y: auto;
+        }
+        
+        .order-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px;
+            margin-bottom: 8px;
+            background: #f1f5f9;
+            border-radius: 8px;
+            border-left: 4px solid #4f46e5;
+        }
+        
+        .product-name {
+            font-weight: 600;
+            color: #334155;
+        }
+        
+        .product-quantity {
+            background: #4f46e5;
+            color: white;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-weight: bold;
+            min-width: 40px;
+            text-align: center;
+        }
+        
+        .empty-orders {
+            text-align: center;
+            color: #64748b;
+            font-style: italic;
+            margin-top: 50px;
+        }
+        
+        .typing-indicator {
+            display: none;
+            padding: 12px 16px;
+            background: #e2e8f0;
+            border-radius: 18px;
+            margin-right: auto;
+            border-bottom-left-radius: 5px;
+            color: #64748b;
+            font-style: italic;
+        }
+        
+        @media (max-width: 768px) {
+            .container {
+                grid-template-columns: 1fr;
+            }
+            
+            .chat-container, .orders-container {
+                height: 60vh;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="chat-container">
+            <div class="chat-header">
+                <h1>🤖 Assistente de Pedidos</h1>
+                <p>Digite seus pedidos em linguagem natural</p>
+            </div>
+            
+            <div class="chat-messages" id="chatMessages">
+                <div class="message bot-message">
+                    Olá! Sou seu assistente de pedidos. 😊
+                    \n\nVocê pode pedir coisas como:
+                    \n• "2 mangas e 3 goiabas"
+                    \n• "cinco maracujás"
+                    \n• "uma caixa de ovos e dois queijos"
+                    \n\nDigite "pronto" quando terminar, ou "cancelar" para sair.
+                </div>
+                <div class="typing-indicator" id="typingIndicator">Digitando...</div>
+            </div>
+            
+            <div class="chat-input">
+                <div class="input-group">
+                    <input type="text" id="messageInput" placeholder="Digite seu pedido..." autocomplete="off">
+                    <button onclick="sendMessage()">Enviar</button>
+                </div>
+            </div>
+        </div>
+        
+        <div class="orders-container">
+            <div class="orders-header">
+                <h2>📋 Pedidos Atuais</h2>
+                <button class="download-btn" onclick="downloadExcel()">📥 Excel</button>
+            </div>
+            <div class="orders-list" id="ordersList">
+                <div class="empty-orders">Nenhum pedido ainda</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const sessionId = '{{ session_id }}';
+        const socket = io();
+        
+        socket.on('connect', function() {
+            console.log('Conectado ao servidor');
+        });
+        
+        socket.on('order_update', function(data) {
+            if (data.session_id === sessionId) {
+                updateOrdersDisplay(data.orders);
+            }
+        });
+        
+        function updateOrdersDisplay(orders) {
+            const ordersList = document.getElementById('ordersList');
+            const orderItems = Object.entries(orders);
+            
+            if (orderItems.length === 0) {
+                ordersList.innerHTML = '<div class="empty-orders">Nenhum pedido ainda</div>';
+                return;
+            }
+            
+            ordersList.innerHTML = orderItems.map(([product, quantity]) => `
+                <div class="order-item">
+                    <span class="product-name">${product}</span>
+                    <span class="product-quantity">${quantity}</span>
+                </div>
+            `).join('');
+        }
+        
+        function sendMessage() {
+            const input = document.getElementById('messageInput');
+            const message = input.value.trim();
+            
+            if (!message) return;
+            
+            // Add user message to chat
+            addMessage(message, 'user');
+            input.value = '';
+            
+            // Show typing indicator
+            showTypingIndicator();
+            
+            // Send to server
+            fetch('/send_message', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    message: message,
+                    session_id: sessionId
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                hideTypingIndicator();
+                addMessage(data.response, 'bot');
+                updateOrdersDisplay(data.orders);
+            })
+            .catch(error => {
+                hideTypingIndicator();
+                addMessage('Erro de conexão. Tente novamente.', 'bot');
+                console.error('Error:', error);
+            });
+        }
+        
+        function addMessage(text, sender) {
+            const chatMessages = document.getElementById('chatMessages');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${sender}-message`;
+            messageDiv.textContent = text;
+            chatMessages.appendChild(messageDiv);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+        
+        function showTypingIndicator() {
+            document.getElementById('typingIndicator').style.display = 'block';
+            document.getElementById('chatMessages').scrollTop = document.getElementById('chatMessages').scrollHeight;
+        }
+        
+        function hideTypingIndicator() {
+            document.getElementById('typingIndicator').style.display = 'none';
+        }
+        
+        function downloadExcel() {
+            window.open('/download_excel', '_blank');
+        }
+        
+        // Enter key to send message
+        document.getElementById('messageInput').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                sendMessage();
+            }
+        });
+        
+        // Load initial orders
+        fetch(`/get_orders?session_id=${sessionId}`)
+            .then(response => response.json())
+            .then(orders => updateOrdersDisplay(orders));
+    </script>
+</body>
+</html>
